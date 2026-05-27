@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4D BIM 建筑动画</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Microsoft YaHei', sans-serif; background: #0d1117; color: #e6edf3; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Header */
+#header { background: #161b22; border-bottom: 1px solid #30363d; padding: 8px 16px; display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+#header h1 { font-size: 16px; color: #58a6ff; font-weight: 600; }
+.header-badge { background: #1f6feb; color: white; font-size: 11px; padding: 2px 8px; border-radius: 12px; }
+
+/* Main layout */
+#main { display: flex; flex: 1; overflow: hidden; }
+
+/* Left panel - Program editor */
+#left-panel { width: 320px; background: #161b22; border-right: 1px solid #30363d; display: flex; flex-direction: column; flex-shrink: 0; }
+#left-panel .panel-title { padding: 10px 14px; font-size: 13px; font-weight: 600; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #21262d; }
+
+#task-list { flex: 1; overflow-y: auto; padding: 8px; }
+#task-list::-webkit-scrollbar { width: 4px; }
+#task-list::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+
+.task-card { background: #0d1117; border: 1px solid #21262d; border-radius: 6px; margin-bottom: 8px; overflow: hidden; cursor: pointer; transition: border-color 0.2s; }
+.task-card:hover { border-color: #388bfd; }
+.task-card.active { border-color: #58a6ff; }
+.task-card-header { padding: 8px 10px; display: flex; align-items: center; gap: 8px; }
+.day-badge { background: #1f6feb; color: white; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; min-width: 44px; text-align: center; }
+.task-name { font-size: 13px; flex: 1; }
+.task-delete { color: #6e7681; font-size: 14px; background: none; border: none; cursor: pointer; padding: 0 4px; }
+.task-delete:hover { color: #f85149; }
+
+.task-card-body { padding: 0 10px 8px; }
+.resource-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font-size: 11px; padding: 2px 8px; border-radius: 12px; display: flex; align-items: center; gap: 4px; }
+.chip-worker { background: #1a2f1a; color: #3fb950; border: 1px solid #2ea043; }
+.chip-machine { background: #2d1f0e; color: #d29922; border: 1px solid #9e6a03; }
+.chip-material { background: #1a1f2e; color: #79c0ff; border: 1px solid #388bfd; }
+
+/* Add task form */
+#add-task-form { border-top: 1px solid #21262d; padding: 10px; }
+#add-task-form .form-row { display: flex; gap: 6px; margin-bottom: 6px; }
+#add-task-form input, #add-task-form select { background: #0d1117; border: 1px solid #30363d; color: #e6edf3; border-radius: 5px; padding: 5px 8px; font-size: 12px; outline: none; }
+#add-task-form input:focus, #add-task-form select:focus { border-color: #58a6ff; }
+.input-day { width: 55px; }
+.input-task { flex: 1; }
+.btn { border: none; border-radius: 5px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-weight: 500; transition: all 0.15s; }
+.btn-primary { background: #238636; color: white; }
+.btn-primary:hover { background: #2ea043; }
+.btn-sm { padding: 3px 8px; font-size: 11px; }
+.btn-secondary { background: #21262d; color: #e6edf3; border: 1px solid #30363d; }
+.btn-secondary:hover { background: #30363d; }
+
+.resource-input-row { display: flex; gap: 4px; align-items: center; }
+.resource-input-row select { flex: 0 0 90px; }
+.resource-input-row input[type=text] { flex: 1; }
+.resource-input-row input[type=number] { width: 48px; }
+
+/* Center - 3D viewport */
+#viewport { flex: 1; position: relative; background: #000; }
+#three-canvas { display: block; width: 100%; height: 100%; }
+
+/* HUD overlays */
+#day-display { position: absolute; top: 12px; left: 12px; background: rgba(13,17,23,0.85); border: 1px solid #30363d; border-radius: 8px; padding: 10px 16px; backdrop-filter: blur(4px); }
+#day-display .day-num { font-size: 28px; font-weight: 700; color: #58a6ff; line-height: 1; }
+#day-display .day-label { font-size: 11px; color: #8b949e; margin-top: 2px; }
+#day-display .task-today { font-size: 12px; color: #e6edf3; margin-top: 6px; max-width: 200px; }
+
+#resource-hud { position: absolute; top: 12px; right: 12px; background: rgba(13,17,23,0.85); border: 1px solid #30363d; border-radius: 8px; padding: 10px 14px; backdrop-filter: blur(4px); min-width: 140px; }
+#resource-hud .hud-title { font-size: 11px; color: #8b949e; margin-bottom: 6px; text-transform: uppercase; }
+.res-row { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-bottom: 3px; }
+.res-icon { font-size: 14px; }
+
+#progress-bar-container { position: absolute; bottom: 60px; left: 12px; right: 12px; background: rgba(13,17,23,0.85); border: 1px solid #30363d; border-radius: 8px; padding: 8px 12px; backdrop-filter: blur(4px); }
+.phase-label { font-size: 11px; color: #8b949e; margin-bottom: 5px; }
+.progress-track { background: #21262d; border-radius: 4px; height: 8px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #238636, #3fb950); border-radius: 4px; transition: width 0.5s ease; }
+.phase-markers { display: flex; justify-content: space-between; margin-top: 4px; }
+.phase-marker { font-size: 10px; color: #6e7681; }
+
+/* Bottom timeline */
+#timeline { height: 52px; background: #161b22; border-top: 1px solid #30363d; display: flex; align-items: center; padding: 0 16px; gap: 14px; flex-shrink: 0; }
+.timeline-btn { width: 32px; height: 32px; border-radius: 50%; background: #21262d; border: 1px solid #30363d; color: #e6edf3; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.15s; }
+.timeline-btn:hover { background: #388bfd; border-color: #388bfd; }
+.timeline-btn.active { background: #238636; border-color: #238636; }
+
+#day-slider-wrap { flex: 1; display: flex; align-items: center; gap: 8px; }
+#day-slider { flex: 1; -webkit-appearance: none; height: 4px; background: #30363d; border-radius: 2px; outline: none; cursor: pointer; }
+#day-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #58a6ff; cursor: pointer; }
+.slider-label { font-size: 12px; color: #8b949e; white-space: nowrap; }
+
+.speed-select { background: #21262d; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 4px 6px; font-size: 12px; outline: none; cursor: pointer; }
+
+/* Modal */
+#modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; display: none; align-items: center; justify-content: center; }
+#modal-overlay.show { display: flex; }
+#modal { background: #161b22; border: 1px solid #30363d; border-radius: 10px; width: 460px; max-width: 95vw; padding: 20px; }
+#modal h3 { font-size: 15px; margin-bottom: 16px; color: #e6edf3; }
+.modal-field { margin-bottom: 12px; }
+.modal-field label { font-size: 12px; color: #8b949e; display: block; margin-bottom: 4px; }
+.modal-field input, .modal-field select, .modal-field textarea { width: 100%; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; border-radius: 5px; padding: 7px 10px; font-size: 13px; outline: none; font-family: inherit; }
+.modal-field textarea { resize: vertical; min-height: 60px; }
+.modal-field input:focus, .modal-field select:focus, .modal-field textarea:focus { border-color: #58a6ff; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+.resources-editor { border: 1px solid #21262d; border-radius: 6px; overflow: hidden; }
+.res-edit-row { display: flex; gap: 6px; padding: 6px 8px; align-items: center; border-bottom: 1px solid #21262d; }
+.res-edit-row:last-child { border-bottom: none; }
+.res-add-btn { width: 100%; padding: 6px; background: none; border: none; color: #58a6ff; font-size: 12px; cursor: pointer; text-align: left; }
+.res-add-btn:hover { background: #161b22; }
+.res-remove-btn { background: none; border: none; color: #6e7681; cursor: pointer; font-size: 14px; }
+.res-remove-btn:hover { color: #f85149; }
+
+/* Tooltip */
+.tooltip { position: absolute; background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #e6edf3; pointer-events: none; z-index: 50; white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>4D BIM 建筑动画系统</h1>
+  <span class="header-badge">Construction Simulation</span>
+  <div style="flex:1"></div>
+  <button class="btn btn-secondary btn-sm" onclick="loadSampleData()">载入示例方案</button>
+  <button class="btn btn-primary btn-sm" onclick="openAddTaskModal()">+ 添加任务</button>
+</div>
+
+<div id="main">
+  <!-- Left panel -->
+  <div id="left-panel">
+    <div class="panel-title">施工计划 Program Plan</div>
+    <div id="task-list"></div>
+  </div>
+
+  <!-- 3D Viewport -->
+  <div id="viewport">
+    <canvas id="three-canvas"></canvas>
+
+    <div id="day-display">
+      <div class="day-num" id="hud-day">第 1 天</div>
+      <div class="day-label">施工进度</div>
+      <div class="task-today" id="hud-task">--</div>
+    </div>
+
+    <div id="resource-hud">
+      <div class="hud-title">今日资源</div>
+      <div id="hud-resources"></div>
+    </div>
+
+    <div id="progress-bar-container">
+      <div class="phase-label">总体进度</div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+      <div class="phase-markers" id="phase-markers"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Timeline -->
+<div id="timeline">
+  <button class="timeline-btn" id="btn-rewind" onclick="rewindAnim()" title="重置">⏮</button>
+  <button class="timeline-btn" id="btn-play" onclick="togglePlay()" title="播放/暂停">▶</button>
+  <button class="timeline-btn" onclick="stepDay(-1)" title="上一天">◀</button>
+  <button class="timeline-btn" onclick="stepDay(1)" title="下一天">▶</button>
+  <div id="day-slider-wrap">
+    <span class="slider-label">第1天</span>
+    <input type="range" id="day-slider" min="1" max="10" value="1" oninput="onSliderChange(this.value)">
+    <span class="slider-label" id="slider-max-label">第10天</span>
+  </div>
+  <select class="speed-select" id="speed-select" onchange="changeSpeed(this.value)">
+    <option value="0.5">0.5x</option>
+    <option value="1" selected>1x</option>
+    <option value="2">2x</option>
+    <option value="4">4x</option>
+  </select>
+</div>
+
+<!-- Add/Edit Task Modal -->
+<div id="modal-overlay" onclick="closeModalIfBg(event)">
+  <div id="modal">
+    <h3 id="modal-title">添加施工任务</h3>
+    <div class="modal-field">
+      <label>施工日期</label>
+      <input type="number" id="f-day" min="1" max="365" value="1" placeholder="第几天">
+    </div>
+    <div class="modal-field">
+      <label>任务名称</label>
+      <input type="text" id="f-name" placeholder="例：挖地基、浇筑基础、砌墙...">
+    </div>
+    <div class="modal-field">
+      <label>任务类型</label>
+      <select id="f-type">
+        <option value="excavation">挖掘 Excavation</option>
+        <option value="foundation">基础 Foundation</option>
+        <option value="structure">结构 Structure</option>
+        <option value="walls">墙体 Walls</option>
+        <option value="roof">屋顶 Roof</option>
+        <option value="finishing">装修 Finishing</option>
+        <option value="other">其他 Other</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>施工资源 Resources</label>
+      <div class="resources-editor" id="resources-editor">
+        <button class="res-add-btn" onclick="addResourceRow()">+ 添加资源</button>
+      </div>
+    </div>
+    <div class="modal-field">
+      <label>备注</label>
+      <textarea id="f-notes" placeholder="可选备注信息..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveTask()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

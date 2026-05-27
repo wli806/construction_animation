@@ -1,0 +1,15 @@
+[Unit]
+Description=4D BIM Construction Animation - FastAPI Backend
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/construction-bim/backend
+Environment="PATH=/var/www/construction-bim/venv/bin"
+ExecStart=/var/www/construction-bim/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
